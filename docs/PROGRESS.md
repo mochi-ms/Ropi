@@ -17,7 +17,7 @@
 - [x] `playback/win32_input.py`, `playback/timing.py`, `playback/focus_watcher.py`, `playback/scheduler.py`, `playback/service.py`
 - [x] `tools/play_cli.py`
 - [x] 완료 기준: 단위 테스트, 타이밍 오차 테스트(평균 ≤ 2ms, p99 ≤ 5ms), 안전장치 테스트
-- [ ] 완료 기준: 실게임 검증 (사용자 확인 대기)
+- [x] 완료 기준: 실게임 검증 (Roblox 비주얼 피아노 61/88건반, Hold Space 유동 페달, 포커스 보호 확인)
 - [x] 완료 기준: domain/formats 커버리지 ≥ 85%
 
 ## Phase 2 — 라이브러리 백엔드
