@@ -9,16 +9,16 @@
 - [x] `.github/workflows/ci.yml` 작성
 - [x] 완료 기준: `python -m ropi` 실행 시 빈 창 + 로그 파일 생성
 - [x] 완료 기준: `pytest` / `ruff check` / `pyright` 통과
-- [ ] 완료 기준: GitHub push 및 CI 통과
+- [x] 완료 기준: GitHub push 및 CI 통과
 
 ## Phase 1 — 코어: 음표 모델, 로더, 키맵, 재생 엔진
-- [ ] `domain/note.py`, `domain/keymap.py`, `domain/arranger.py`
-- [ ] `formats/midi_loader.py`, `formats/vp_sheet.py`
-- [ ] `playback/win32_input.py`, `playback/timing.py`, `playback/focus_watcher.py`, `playback/scheduler.py`, `playback/service.py`
-- [ ] `tools/play_cli.py`
-- [ ] 완료 기준: 단위 테스트, 타이밍 오차 테스트(평균 ≤ 2ms, p99 ≤ 5ms), 안전장치 테스트
-- [ ] 완료 기준: 실게임 검증 (사용자 확인)
-- [ ] 완료 기준: domain/formats 커버리지 ≥ 85%
+- [x] `domain/note.py`, `domain/keymap.py`, `domain/arranger.py`
+- [x] `formats/midi_loader.py`, `formats/vp_sheet.py`
+- [x] `playback/win32_input.py`, `playback/timing.py`, `playback/focus_watcher.py`, `playback/scheduler.py`, `playback/service.py`
+- [x] `tools/play_cli.py`
+- [x] 완료 기준: 단위 테스트, 타이밍 오차 테스트(평균 ≤ 2ms, p99 ≤ 5ms), 안전장치 테스트
+- [ ] 완료 기준: 실게임 검증 (사용자 확인 대기)
+- [x] 완료 기준: domain/formats 커버리지 ≥ 85%
 
 ## Phase 2 — 라이브러리 백엔드
 - [ ] `library/db.py`, `migrations/001_init.sql`, `file_store.py`, `repository.py`, `search.py`, `service.py`, `backup.py`

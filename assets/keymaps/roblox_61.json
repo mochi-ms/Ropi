@@ -1,0 +1,499 @@
+{
+  "id": "roblox_61",
+  "name": "Roblox 61건반 (표준)",
+  "description": "표준 61건반 가상 피아노 (C2–C7, 흰 건반 1..m + 검은 건반 Shift)",
+  "key_count": 61,
+  "base_midi_note": 36,
+  "min_midi_note": 36,
+  "max_midi_note": 96,
+  "bindings": [
+    {
+      "midi_note": 36,
+      "key": "1",
+      "base_key": "1",
+      "scancode": 2,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 37,
+      "key": "!",
+      "base_key": "1",
+      "scancode": 2,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 38,
+      "key": "2",
+      "base_key": "2",
+      "scancode": 3,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 39,
+      "key": "@",
+      "base_key": "2",
+      "scancode": 3,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 40,
+      "key": "3",
+      "base_key": "3",
+      "scancode": 4,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 41,
+      "key": "4",
+      "base_key": "4",
+      "scancode": 5,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 42,
+      "key": "$",
+      "base_key": "4",
+      "scancode": 5,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 43,
+      "key": "5",
+      "base_key": "5",
+      "scancode": 6,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 44,
+      "key": "%",
+      "base_key": "5",
+      "scancode": 6,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 45,
+      "key": "6",
+      "base_key": "6",
+      "scancode": 7,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 46,
+      "key": "^",
+      "base_key": "6",
+      "scancode": 7,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 47,
+      "key": "7",
+      "base_key": "7",
+      "scancode": 8,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 48,
+      "key": "8",
+      "base_key": "8",
+      "scancode": 9,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 49,
+      "key": "*",
+      "base_key": "8",
+      "scancode": 9,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 50,
+      "key": "9",
+      "base_key": "9",
+      "scancode": 10,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 51,
+      "key": "(",
+      "base_key": "9",
+      "scancode": 10,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 52,
+      "key": "0",
+      "base_key": "0",
+      "scancode": 11,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 53,
+      "key": "q",
+      "base_key": "q",
+      "scancode": 16,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 54,
+      "key": "Q",
+      "base_key": "q",
+      "scancode": 16,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 55,
+      "key": "w",
+      "base_key": "w",
+      "scancode": 17,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 56,
+      "key": "W",
+      "base_key": "w",
+      "scancode": 17,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 57,
+      "key": "e",
+      "base_key": "e",
+      "scancode": 18,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 58,
+      "key": "E",
+      "base_key": "e",
+      "scancode": 18,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 59,
+      "key": "r",
+      "base_key": "r",
+      "scancode": 19,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 60,
+      "key": "t",
+      "base_key": "t",
+      "scancode": 20,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 61,
+      "key": "T",
+      "base_key": "t",
+      "scancode": 20,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 62,
+      "key": "y",
+      "base_key": "y",
+      "scancode": 21,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 63,
+      "key": "Y",
+      "base_key": "y",
+      "scancode": 21,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 64,
+      "key": "u",
+      "base_key": "u",
+      "scancode": 22,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 65,
+      "key": "i",
+      "base_key": "i",
+      "scancode": 23,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 66,
+      "key": "I",
+      "base_key": "i",
+      "scancode": 23,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 67,
+      "key": "o",
+      "base_key": "o",
+      "scancode": 24,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 68,
+      "key": "O",
+      "base_key": "o",
+      "scancode": 24,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 69,
+      "key": "p",
+      "base_key": "p",
+      "scancode": 25,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 70,
+      "key": "P",
+      "base_key": "p",
+      "scancode": 25,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 71,
+      "key": "a",
+      "base_key": "a",
+      "scancode": 30,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 72,
+      "key": "s",
+      "base_key": "s",
+      "scancode": 31,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 73,
+      "key": "S",
+      "base_key": "s",
+      "scancode": 31,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 74,
+      "key": "d",
+      "base_key": "d",
+      "scancode": 32,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 75,
+      "key": "D",
+      "base_key": "d",
+      "scancode": 32,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 76,
+      "key": "f",
+      "base_key": "f",
+      "scancode": 33,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 77,
+      "key": "g",
+      "base_key": "g",
+      "scancode": 34,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 78,
+      "key": "G",
+      "base_key": "g",
+      "scancode": 34,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 79,
+      "key": "h",
+      "base_key": "h",
+      "scancode": 35,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 80,
+      "key": "H",
+      "base_key": "h",
+      "scancode": 35,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 81,
+      "key": "j",
+      "base_key": "j",
+      "scancode": 36,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 82,
+      "key": "J",
+      "base_key": "j",
+      "scancode": 36,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 83,
+      "key": "k",
+      "base_key": "k",
+      "scancode": 37,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 84,
+      "key": "l",
+      "base_key": "l",
+      "scancode": 38,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 85,
+      "key": "L",
+      "base_key": "l",
+      "scancode": 38,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 86,
+      "key": "z",
+      "base_key": "z",
+      "scancode": 44,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 87,
+      "key": "Z",
+      "base_key": "z",
+      "scancode": 44,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 88,
+      "key": "x",
+      "base_key": "x",
+      "scancode": 45,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 89,
+      "key": "c",
+      "base_key": "c",
+      "scancode": 46,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 90,
+      "key": "C",
+      "base_key": "c",
+      "scancode": 46,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 91,
+      "key": "v",
+      "base_key": "v",
+      "scancode": 47,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 92,
+      "key": "V",
+      "base_key": "v",
+      "scancode": 47,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 93,
+      "key": "b",
+      "base_key": "b",
+      "scancode": 48,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 94,
+      "key": "B",
+      "base_key": "b",
+      "scancode": 48,
+      "modifier": "shift",
+      "extended": false
+    },
+    {
+      "midi_note": 95,
+      "key": "n",
+      "base_key": "n",
+      "scancode": 49,
+      "modifier": "none",
+      "extended": false
+    },
+    {
+      "midi_note": 96,
+      "key": "m",
+      "base_key": "m",
+      "scancode": 50,
+      "modifier": "none",
+      "extended": false
+    }
+  ]
+}
