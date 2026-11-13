@@ -47,6 +47,25 @@ class NoteEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class PedalEvent:
+    """Sustain pedal (MIDI CC64) active span in milliseconds."""
+
+    start_ms: int
+    duration_ms: int
+    track: int = 0
+
+    def __post_init__(self) -> None:
+        if self.start_ms < 0:
+            raise ValueError(f"start_ms must be >= 0, got {self.start_ms}")
+        if self.duration_ms < 0:
+            raise ValueError(f"duration_ms must be >= 0, got {self.duration_ms}")
+
+    @property
+    def end_ms(self) -> int:
+        return self.start_ms + self.duration_ms
+
+
+@dataclass(frozen=True, slots=True)
 class TrackInfo:
     """Metadata for a single track inside a parsed song."""
 
@@ -69,6 +88,7 @@ class SongData:
     max_note: int | None
     source_format: str = "mid"
     title: str = ""
+    pedals: tuple[PedalEvent, ...] = ()
 
     @property
     def note_count(self) -> int:

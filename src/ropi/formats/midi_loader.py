@@ -10,10 +10,12 @@ from pathlib import Path
 import mido
 
 from ropi.core.errors import FormatLoadError
-from ropi.domain.note import NoteEvent, SongData, TrackInfo
+from ropi.domain.note import NoteEvent, PedalEvent, SongData, TrackInfo
 
 _DEFAULT_TEMPO_US = 500_000  # 120 BPM
 _DRUM_CHANNEL = 9  # MIDI channel 10 (0-indexed)
+_SUSTAIN_PEDAL_CC = 64
+_SUSTAIN_PEDAL_THRESHOLD = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +111,7 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
     tempo_map = _TempoMap(mid.ticks_per_beat, tempo_events)
 
     all_notes: list[NoteEvent] = []
+    all_pedals: list[PedalEvent] = []
     track_infos: list[TrackInfo] = []
 
     for track_idx, track in enumerate(mid.tracks):
@@ -116,6 +119,7 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
         track_name = ""
         channels_seen: set[int] = set()
         active: dict[tuple[int, int], deque[tuple[int, int]]] = defaultdict(deque)
+        active_pedals: dict[int, int] = {}
         track_note_count = 0
 
         for msg in track:
@@ -167,6 +171,29 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
                     )
                     if include_drums or channel != _DRUM_CHANNEL:
                         track_note_count += 1
+            elif (
+                msg_type == "control_change"
+                and int(getattr(msg, "control", -1)) == _SUSTAIN_PEDAL_CC
+            ):
+                channels_seen.add(channel)
+                if not include_drums and channel == _DRUM_CHANNEL:
+                    continue
+                cc_val = int(getattr(msg, "value", 0))
+                if cc_val >= _SUSTAIN_PEDAL_THRESHOLD:
+                    if channel not in active_pedals:
+                        active_pedals[channel] = abs_tick
+                elif channel in active_pedals:
+                    start_tick = active_pedals.pop(channel)
+                    start_ms = tempo_map.tick_to_ms(start_tick)
+                    end_ms = max(start_ms, tempo_map.tick_to_ms(abs_tick))
+                    if end_ms > start_ms:
+                        all_pedals.append(
+                            PedalEvent(
+                                start_ms=start_ms,
+                                duration_ms=end_ms - start_ms,
+                                track=track_idx,
+                            )
+                        )
 
         # Close any dangling notes left open at end of track.
         for (channel, note_num), queue in active.items():
@@ -187,6 +214,18 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
                 )
                 track_note_count += 1
 
+        for start_tick in active_pedals.values():
+            start_ms = tempo_map.tick_to_ms(start_tick)
+            end_ms = max(start_ms, tempo_map.tick_to_ms(abs_tick))
+            if end_ms > start_ms:
+                all_pedals.append(
+                    PedalEvent(
+                        start_ms=start_ms,
+                        duration_ms=end_ms - start_ms,
+                        track=track_idx,
+                    )
+                )
+
         is_drum = channels_seen == {_DRUM_CHANNEL}
         primary_channel = min(channels_seen) if len(channels_seen) == 1 else None
         if track_note_count > 0 or track_name:
@@ -201,6 +240,7 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
             )
 
     all_notes.sort(key=lambda n: (n.start_ms, n.midi_note, n.track))
+    all_pedals.sort(key=lambda p: (p.start_ms, p.track))
     duration_ms = max((n.end_ms for n in all_notes), default=tempo_map.tick_to_ms(max_tick))
     min_note = min((n.midi_note for n in all_notes), default=None)
     max_note = max((n.midi_note for n in all_notes), default=None)
@@ -214,6 +254,7 @@ def load_midi(path: Path, *, include_drums: bool = True) -> SongData:
         max_note=max_note,
         source_format="mid",
         title=path.stem,
+        pedals=tuple(all_pedals),
     )
 
 

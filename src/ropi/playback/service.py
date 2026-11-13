@@ -206,6 +206,12 @@ class PlaybackService:
         if was_playing and self._current_song is not None:
             self.play(start_ms=pos, countdown_sec=0, activate_roblox=False)
 
+    def preview_actions(self) -> list[KeyAction]:
+        """Return arranged KeyActions for the currently loaded song and options."""
+        if self._current_song is None:
+            return []
+        return self._build_actions()
+
     def _build_actions(self) -> list[KeyAction]:
         assert self._current_song is not None
         return arrange_song(self._current_song, self.active_keymap, self._options)

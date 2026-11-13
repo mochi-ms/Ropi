@@ -162,3 +162,25 @@ def test_vp_sheet_parsing_and_errors(tmp_path: Path) -> None:
     bin_file.write_bytes(b"\x00\x01\x02")
     with pytest.raises(FormatLoadError):
         load_vp_sheet_file(bin_file)
+
+
+def test_midi_sustain_pedal_cc64_and_dangling_close(tmp_path: Path) -> None:
+    def build(mid: mido.MidiFile) -> None:
+        tr = mido.MidiTrack()
+        # Beat = 500ms at 120 BPM (480 ticks)
+        tr.append(mido.Message("control_change", channel=0, control=64, value=127, time=0))
+        tr.append(mido.Message("note_on", channel=0, note=60, velocity=90, time=0))
+        tr.append(mido.Message("note_off", channel=0, note=60, velocity=0, time=480))
+        tr.append(mido.Message("control_change", channel=0, control=64, value=0, time=0))
+        # Second pedal held past end of track (tick 960 -> 1440)
+        tr.append(mido.Message("control_change", channel=0, control=64, value=64, time=480))
+        tr.append(mido.Message("note_on", channel=0, note=64, velocity=90, time=0))
+        tr.append(mido.Message("note_off", channel=0, note=64, velocity=0, time=480))
+        mid.tracks.append(tr)
+
+    song = load_midi(_write_temp_midi(tmp_path / "pedal_cc64.mid", build))
+    assert len(song.pedals) == 2
+    assert song.pedals[0].start_ms == 0
+    assert song.pedals[0].duration_ms == 500
+    assert song.pedals[1].start_ms == 1000
+    assert song.pedals[1].duration_ms == 500

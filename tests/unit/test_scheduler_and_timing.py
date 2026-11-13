@@ -78,8 +78,8 @@ def test_scheduler_10k_events_timing_accuracy() -> None:
     assert done.wait(timeout=10.0), "10k benchmark did not complete in time"
     assert len(backend.events) == 10_080
 
-    # Align actual relative timestamps against first event to evaluate scheduler jitter.
-    origin_perf = backend.events[0].perf_ns - backend.events[0].target_ns
+    # Align actual relative timestamps against steady-state clock origin to evaluate jitter.
+    origin_perf = round(statistics.median(ev.perf_ns - ev.target_ns for ev in backend.events))
     errors_ms = [
         abs((ev.perf_ns - origin_perf) - ev.target_ns) / 1_000_000 for ev in backend.events
     ]
@@ -182,3 +182,34 @@ def test_win32_input_struct_layout_and_cli_scales() -> None:
     assert build_scale_song("cmajor").note_count == 29
     assert build_scale_song("chromatic61").note_count == 61
     assert build_scale_song("chromatic88").note_count == 88
+    demo = build_scale_song("demo")
+    assert demo.note_count == 28
+    assert demo.min_note == 24
+
+
+def test_scheduler_pedal_active_snapshot() -> None:
+    km = Keymap(build_roblox_61_profile())
+    song = SongData(
+        notes=(NoteEvent(0, 120, 48), NoteEvent(150, 120, 55)),
+        tracks=(TrackInfo(0, "Piano", 0, 2),),
+        duration_ms=270,
+        bpm=120.0,
+        min_note=48,
+        max_note=55,
+    )
+    backend = FakeInputBackend()
+    focus = FakeFocusBackend(foreground=True)
+    snaps: list[PlaybackSnapshot] = []
+    done = threading.Event()
+
+    def on_snap(snap: PlaybackSnapshot) -> None:
+        snaps.append(snap)
+        if snap.state == PlaybackState.IDLE and snap.position_ms > 0:
+            done.set()
+
+    service = PlaybackService(backend=backend, focus_backend=focus, keymap=km, on_snapshot=on_snap)
+    service.load_song(song, ArrangeOptions(sustain_mode="pedal"))
+    service.play(countdown_sec=0, activate_roblox=False)
+    assert done.wait(timeout=3.0)
+    assert any(s.state == PlaybackState.PLAYING and s.pedal_active for s in snaps)
+    assert not backend.pressed_keys

@@ -9,16 +9,23 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ropi.domain.keymap import MODIFIER_SCANCODES, KeyBinding, Keymap, Modifier
-from ropi.domain.note import NoteEvent, SongData
+from ropi.domain.note import NoteEvent, PedalEvent, SongData
 
 OutOfRangeMode = Literal["fold", "drop", "keymap_88"]
 SustainMode = Literal["tap", "hold", "pedal"]
+PedalStrategy = Literal["auto", "midi", "smart"]
 ActionKind = Literal["down", "up"]
 
 _KIND_ORDER: dict[ActionKind, int] = {"up": 0, "down": 1}
 _MODIFIER_ORDER: dict[Modifier, int] = {"none": 0, "shift": 1, "ctrl": 2}
 _MIN_REPRESS_GAP_NS = 8_000_000  # 8ms minimum release before re-striking same key
 _MIN_HOLD_NS = 15_000_000  # 15ms minimum press duration
+_PEDAL_LIFT_GAP_NS = 30_000_000  # >= 30ms release so Roblox registers Space InputEnded->InputBegan
+_PEDAL_MIN_HOLD_NS = 25_000_000
+_SMART_GAP_LIFT_NS = 300_000_000  # lift pedal during rests > 300ms
+_SMART_MIN_CHANGE_NS = 380_000_000  # avoid rapid chattering within one chord
+_SMART_MAX_SPAN_NS = 2_200_000_000  # force clean re-pedal before excess blur
+_SLICE_WINDOW_NS = 25_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +37,7 @@ class ArrangeOptions:
     enabled_tracks: frozenset[int] | None = None
     out_of_range: OutOfRangeMode = "fold"
     sustain_mode: SustainMode = "tap"
+    pedal_strategy: PedalStrategy = "auto"
     tap_duration_ms: int = 35
     humanize_timing_ms: int = 0
     humanize_roll_ms: int = 0
@@ -112,6 +120,7 @@ class _ScheduledNote:
     up_ns: int
     binding: KeyBinding
     song_ms: int
+    end_song_ms: int
 
 
 def arrange_song(
@@ -175,6 +184,7 @@ def arrange_song(
                     up_ns=down_ns + dur_ns,
                     binding=binding,
                     song_ms=orig_ms,
+                    end_song_ms=orig_ms + note.duration_ms,
                 )
             )
 
@@ -219,17 +229,25 @@ def arrange_song(
                 modifier=item.binding.modifier,
                 midi_note=item.binding.midi_note,
                 label=item.binding.key,
-                song_ms=item.song_ms,
+                song_ms=item.end_song_ms,
             )
         )
 
     if opts.sustain_mode == "pedal" and cleaned:
-        _append_pedal_actions(cleaned, actions)
+        _append_pedal_actions(
+            scheduled=cleaned,
+            midi_pedals=song.pedals,
+            drum_tracks=drum_tracks,
+            opts=opts,
+            inv_speed=inv_speed,
+            out=actions,
+        )
 
     actions.sort(
         key=lambda a: (
             a.time_ns,
             _KIND_ORDER[a.kind],
+            0 if a.midi_note < 0 else 1,
             _MODIFIER_ORDER[a.modifier],
             a.scancode,
         )
@@ -244,64 +262,274 @@ def _map_note(midi_note: int, keymap: Keymap, mode: OutOfRangeMode) -> KeyBindin
     return keymap.resolve(folded)
 
 
-def _append_pedal_actions(scheduled: Sequence[_ScheduledNote], out: list[KeyAction]) -> None:
-    """Emit sustain pedal (Space) down/up around musical phrases when pedal mode is active."""
+@dataclass(slots=True)
+class _PedalSpan:
+    down_ns: int
+    up_ns: int
+    song_start_ms: int
+    song_end_ms: int
+
+
+@dataclass(slots=True)
+class _NoteSlice:
+    start_ns: int
+    end_ns: int
+    min_midi: int
+    pitch_classes: set[int]
+    song_start_ms: int
+    song_end_ms: int
+
+
+def _append_pedal_actions(
+    *,
+    scheduled: Sequence[_ScheduledNote],
+    midi_pedals: Sequence[PedalEvent],
+    drum_tracks: set[int],
+    opts: ArrangeOptions,
+    inv_speed: float,
+    out: list[KeyAction],
+) -> None:
+    """Emit sustain pedal (Space) down/up actions from MIDI CC64 or smart chord/phrase logic."""
+    filtered_pedals: list[PedalEvent] = []
+    for p in midi_pedals:
+        if opts.enabled_tracks is not None:
+            if p.track not in opts.enabled_tracks:
+                continue
+        elif p.track in drum_tracks:
+            continue
+        filtered_pedals.append(p)
+
+    use_midi = opts.pedal_strategy == "midi" or (
+        opts.pedal_strategy == "auto" and bool(filtered_pedals)
+    )
+    if use_midi:
+        spans = _schedule_midi_pedal_spans(filtered_pedals, inv_speed)
+    else:
+        spans = _schedule_smart_pedal_spans(scheduled)
+
+    _normalize_and_emit_pedal_spans(spans, out, speed=opts.speed)
+
+
+def _schedule_midi_pedal_spans(pedals: Sequence[PedalEvent], inv_speed: float) -> list[_PedalSpan]:
+    raw: list[_PedalSpan] = []
+    for p in sorted(pedals, key=lambda item: (item.start_ms, item.end_ms)):
+        down_ns = max(0, round(p.start_ms * inv_speed * 1_000_000))
+        up_ns = max(down_ns, round(p.end_ms * inv_speed * 1_000_000))
+        if up_ns - down_ns >= _PEDAL_MIN_HOLD_NS:
+            raw.append(
+                _PedalSpan(
+                    down_ns=down_ns,
+                    up_ns=up_ns,
+                    song_start_ms=p.start_ms,
+                    song_end_ms=p.end_ms,
+                )
+            )
+    return raw
+
+
+def _group_note_slices(scheduled: Sequence[_ScheduledNote]) -> list[_NoteSlice]:
+    slices: list[_NoteSlice] = []
+    for item in scheduled:
+        pc = item.binding.midi_note % 12
+        if slices and item.down_ns - slices[-1].start_ns <= _SLICE_WINDOW_NS:
+            cur = slices[-1]
+            cur.end_ns = max(cur.end_ns, item.up_ns)
+            cur.min_midi = min(cur.min_midi, item.binding.midi_note)
+            cur.pitch_classes.add(pc)
+            cur.song_end_ms = max(cur.song_end_ms, item.song_ms)
+        else:
+            slices.append(
+                _NoteSlice(
+                    start_ns=item.down_ns,
+                    end_ns=item.up_ns,
+                    min_midi=item.binding.midi_note,
+                    pitch_classes={pc},
+                    song_start_ms=item.song_ms,
+                    song_end_ms=item.song_ms,
+                )
+            )
+    return slices
+
+
+def _should_refresh_pedal(
+    *,
+    span_start_ns: int,
+    span_bass: int,
+    span_pcs: set[int],
+    next_slice: _NoteSlice,
+) -> bool:
+    held_ns = next_slice.start_ns - span_start_ns
+    if held_ns < _SMART_MIN_CHANGE_NS:
+        return False
+    if held_ns >= _SMART_MAX_SPAN_NS:
+        return True
+
+    bass_changed = (
+        next_slice.min_midi != span_bass
+        and (next_slice.min_midi <= 59 or next_slice.min_midi < span_bass + 12)
+        and (abs(next_slice.min_midi - span_bass) % 12 != 0)
+        and (
+            next_slice.min_midi <= 55
+            or len(next_slice.pitch_classes) >= 2
+            or held_ns >= 700_000_000
+        )
+    )
+    if bass_changed:
+        return True
+
+    combined_pcs = span_pcs | next_slice.pitch_classes
+    if len(combined_pcs) >= 5:
+        return True
+
+    if held_ns >= 1_150_000_000:
+        removed_old_pcs = span_pcs - next_slice.pitch_classes
+        for new_pc in next_slice.pitch_classes:
+            for old_pc in removed_old_pcs:
+                if (new_pc - old_pc) % 12 in (1, 11):
+                    return True
+
+    return False
+
+
+def _schedule_smart_pedal_spans(scheduled: Sequence[_ScheduledNote]) -> list[_PedalSpan]:
+    slices = _group_note_slices(scheduled)
+    if not slices:
+        return []
+
+    spans: list[_PedalSpan] = []
+    first = slices[0]
+    span_down_ns = first.start_ns
+    span_end_ns = first.end_ns
+    span_start_ms = first.song_start_ms
+    span_end_ms = first.song_end_ms
+    span_bass = first.min_midi
+    span_pcs = set(first.pitch_classes)
+
+    for sl in slices[1:]:
+        gap_ns = sl.start_ns - span_end_ns
+        if gap_ns > _SMART_GAP_LIFT_NS:
+            lift_ns = min(span_end_ns + 40_000_000, sl.start_ns - _PEDAL_LIFT_GAP_NS)
+            lift_ns = max(span_down_ns + _PEDAL_MIN_HOLD_NS, lift_ns)
+            spans.append(
+                _PedalSpan(
+                    down_ns=span_down_ns,
+                    up_ns=lift_ns,
+                    song_start_ms=span_start_ms,
+                    song_end_ms=span_end_ms,
+                )
+            )
+            span_down_ns = sl.start_ns
+            span_end_ns = sl.end_ns
+            span_start_ms = sl.song_start_ms
+            span_end_ms = sl.song_end_ms
+            span_bass = sl.min_midi
+            span_pcs = set(sl.pitch_classes)
+            continue
+
+        if _should_refresh_pedal(
+            span_start_ns=span_down_ns,
+            span_bass=span_bass,
+            span_pcs=span_pcs,
+            next_slice=sl,
+        ):
+            lift_ns = sl.start_ns - _PEDAL_LIFT_GAP_NS
+            if lift_ns - span_down_ns >= _PEDAL_MIN_HOLD_NS:
+                spans.append(
+                    _PedalSpan(
+                        down_ns=span_down_ns,
+                        up_ns=lift_ns,
+                        song_start_ms=span_start_ms,
+                        song_end_ms=sl.song_start_ms,
+                    )
+                )
+                span_down_ns = sl.start_ns
+                span_end_ns = sl.end_ns
+                span_start_ms = sl.song_start_ms
+                span_end_ms = sl.song_end_ms
+                span_bass = sl.min_midi
+                span_pcs = set(sl.pitch_classes)
+                continue
+
+        span_end_ns = max(span_end_ns, sl.end_ns)
+        span_end_ms = max(span_end_ms, sl.song_end_ms)
+        span_pcs |= sl.pitch_classes
+        if sl.start_ns - span_down_ns <= 120_000_000:
+            span_bass = min(span_bass, sl.min_midi)
+
+    spans.append(
+        _PedalSpan(
+            down_ns=span_down_ns,
+            up_ns=max(span_down_ns + _PEDAL_MIN_HOLD_NS, span_end_ns),
+            song_start_ms=span_start_ms,
+            song_end_ms=span_end_ms,
+        )
+    )
+    return spans
+
+
+def _normalize_and_emit_pedal_spans(
+    spans: Sequence[_PedalSpan], out: list[KeyAction], *, speed: float
+) -> None:
+    """Merge overlapping spans, enforce clean Space lift gaps, and emit KeyActions."""
+    if not spans:
+        return
+    ordered = sorted(spans, key=lambda s: (s.down_ns, s.up_ns))
+    normalized: list[_PedalSpan] = [
+        _PedalSpan(
+            down_ns=ordered[0].down_ns,
+            up_ns=ordered[0].up_ns,
+            song_start_ms=ordered[0].song_start_ms,
+            song_end_ms=ordered[0].song_end_ms,
+        )
+    ]
+
+    for cur in ordered[1:]:
+        prev = normalized[-1]
+        if cur.down_ns <= prev.up_ns:
+            prev.up_ns = max(prev.up_ns, cur.up_ns)
+            prev.song_end_ms = max(prev.song_end_ms, cur.song_end_ms)
+            continue
+
+        gap = cur.down_ns - prev.up_ns
+        if gap < _PEDAL_LIFT_GAP_NS:
+            trimmed_up = cur.down_ns - _PEDAL_LIFT_GAP_NS
+            if trimmed_up - prev.down_ns >= _PEDAL_MIN_HOLD_NS:
+                prev.up_ns = trimmed_up
+            else:
+                prev.up_ns = max(prev.up_ns, cur.up_ns)
+                prev.song_end_ms = max(prev.song_end_ms, cur.song_end_ms)
+                continue
+
+        normalized.append(
+            _PedalSpan(
+                down_ns=cur.down_ns,
+                up_ns=cur.up_ns,
+                song_start_ms=cur.song_start_ms,
+                song_end_ms=cur.song_end_ms,
+            )
+        )
+
     pedal_sc = MODIFIER_SCANCODES["space"]
-    gap_threshold_ns = 350_000_000  # lift pedal during pauses > 350ms
-    phrase_start = scheduled[0].down_ns
-    phrase_end = scheduled[0].up_ns
-    phrase_start_song_ms = scheduled[0].song_ms
-    phrase_end_song_ms = scheduled[0].song_ms
-
-    for item in scheduled[1:]:
-        if item.down_ns - phrase_end > gap_threshold_ns:
-            out.append(
-                KeyAction(
-                    time_ns=phrase_start,
-                    kind="down",
-                    scancode=pedal_sc,
-                    modifier="none",
-                    midi_note=-1,
-                    label="Space",
-                    song_ms=phrase_start_song_ms,
-                )
+    for span in normalized:
+        out.append(
+            KeyAction(
+                time_ns=span.down_ns,
+                kind="down",
+                scancode=pedal_sc,
+                modifier="none",
+                midi_note=-1,
+                label="Space",
+                song_ms=span.song_start_ms,
             )
-            out.append(
-                KeyAction(
-                    time_ns=phrase_end,
-                    kind="up",
-                    scancode=pedal_sc,
-                    modifier="none",
-                    midi_note=-1,
-                    label="Space",
-                    song_ms=phrase_end_song_ms,
-                )
+        )
+        out.append(
+            KeyAction(
+                time_ns=span.up_ns,
+                kind="up",
+                scancode=pedal_sc,
+                modifier="none",
+                midi_note=-1,
+                label="Space",
+                song_ms=round((span.up_ns * speed) / 1_000_000),
             )
-            phrase_start = item.down_ns
-            phrase_start_song_ms = item.song_ms
-        if item.up_ns >= phrase_end:
-            phrase_end = item.up_ns
-            phrase_end_song_ms = item.song_ms
-
-    out.append(
-        KeyAction(
-            time_ns=phrase_start,
-            kind="down",
-            scancode=pedal_sc,
-            modifier="none",
-            midi_note=-1,
-            label="Space",
-            song_ms=phrase_start_song_ms,
         )
-    )
-    out.append(
-        KeyAction(
-            time_ns=phrase_end,
-            kind="up",
-            scancode=pedal_sc,
-            modifier="none",
-            midi_note=-1,
-            label="Space",
-            song_ms=phrase_end_song_ms,
-        )
-    )

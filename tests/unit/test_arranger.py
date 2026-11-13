@@ -9,10 +9,15 @@ from ropi.domain.arranger import (
     suggest_transpose,
 )
 from ropi.domain.keymap import Keymap, build_roblox_61_profile, build_roblox_88_profile
-from ropi.domain.note import NoteEvent, SongData, TrackInfo
+from ropi.domain.note import NoteEvent, PedalEvent, SongData, TrackInfo
 
 
-def _make_song(notes: list[NoteEvent], *, include_drum: bool = False) -> SongData:
+def _make_song(
+    notes: list[NoteEvent],
+    *,
+    include_drum: bool = False,
+    pedals: tuple[PedalEvent, ...] = (),
+) -> SongData:
     tracks = [TrackInfo(0, "Piano", 0, len(notes), is_drum=False)]
     if include_drum:
         tracks.append(TrackInfo(1, "Drums", 9, 1, is_drum=True))
@@ -24,6 +29,7 @@ def _make_song(notes: list[NoteEvent], *, include_drum: bool = False) -> SongDat
         bpm=120.0,
         min_note=min((n.midi_note for n in notes), default=None),
         max_note=max((n.midi_note for n in notes), default=None),
+        pedals=pedals,
     )
 
 
@@ -110,3 +116,66 @@ def test_repress_gap_and_pedal_and_humanize() -> None:
     )
     hum_downs = [a for a in hum_actions if a.kind == "down"]
     assert hum_downs[1].time_ns - hum_downs[0].time_ns == 12_000_000
+
+
+def test_dynamic_pedal_midi_cc64_and_smart_repedal() -> None:
+    km61 = Keymap(build_roblox_61_profile())
+
+    # 1) MIDI CC64 pedals with a 5ms flutter gap -> trimmed to >=30ms Space release gap
+    midi_song = _make_song(
+        [
+            NoteEvent(0, 900, 48),
+            NoteEvent(1000, 900, 55),
+        ],
+        pedals=(
+            PedalEvent(start_ms=0, duration_ms=995),
+            PedalEvent(start_ms=1000, duration_ms=1000),
+        ),
+    )
+    midi_acts = arrange_song(
+        midi_song,
+        km61,
+        ArrangeOptions(sustain_mode="pedal", pedal_strategy="midi"),
+    )
+    midi_pedal = [a for a in midi_acts if a.label == "Space"]
+    assert [(a.kind, a.time_ns // 1_000_000) for a in midi_pedal] == [
+        ("down", 0),
+        ("up", 970),
+        ("down", 1000),
+        ("up", 2000),
+    ]
+
+    # 2) Smart auto-pedal without CC64: continuous C -> G -> Am -> F chords should refresh pedal!
+    smart_song = _make_song(
+        [
+            NoteEvent(0, 950, 48),  # C3
+            NoteEvent(0, 400, 64),
+            NoteEvent(500, 400, 67),
+            NoteEvent(1000, 950, 43),  # G2 (bass moves cleanly)
+            NoteEvent(1000, 400, 62),
+            NoteEvent(1500, 400, 67),
+            NoteEvent(2000, 950, 45),  # A2
+            NoteEvent(2000, 400, 64),
+            # Rest 500ms after 2950 -> 3500
+            NoteEvent(3500, 500, 41),  # F2
+            NoteEvent(3500, 500, 60),
+        ]
+    )
+    smart_acts = arrange_song(
+        smart_song,
+        km61,
+        ArrangeOptions(sustain_mode="pedal", pedal_strategy="auto"),
+    )
+    smart_pedal = [a for a in smart_acts if a.label == "Space"]
+    smart_downs = [a for a in smart_pedal if a.kind == "down"]
+    smart_ups = [a for a in smart_pedal if a.kind == "up"]
+    # Should re-pedal at each bass/chord shift (4 total spans: C, G, Am, F)
+    assert len(smart_downs) == 4
+    assert len(smart_ups) == 4
+    # Every lift->repress gap must be >= 30ms so Roblox registers Space InputEnded/Began
+    for up_act, next_down_act in zip(smart_ups[:-1], smart_downs[1:], strict=True):
+        assert next_down_act.time_ns - up_act.time_ns >= 30_000_000
+
+    # At t=0, Space down must sort ahead of note downs at same timestamp
+    at_zero = [a for a in smart_acts if a.time_ns == 0 and a.kind == "down"]
+    assert at_zero[0].label == "Space"

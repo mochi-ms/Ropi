@@ -8,7 +8,9 @@ import threading
 import time
 from types import TracebackType
 
-_DEFAULT_SPIN_THRESHOLD_NS = 1_800_000  # 1.8 ms spin window
+_DEFAULT_SPIN_THRESHOLD_NS = (
+    2_500_000  # 2.5 ms spin window covers Win11 high-res timer wakeup jitter
+)
 _STOP_POLL_SLICE_NS = 12_000_000  # check stop_event at least every 12 ms during long waits
 
 
@@ -60,13 +62,10 @@ def wait_until_ns(
         if remaining <= 0:
             return True
         if remaining > spin_threshold_ns:
+            # Python 3.11+ time.sleep uses Win32 high-res waitable timers (~0.5ms jitter),
+            # whereas Event.wait relies on condition variables quantized to ~15.6ms ticks.
             sleep_ns = min(remaining - spin_threshold_ns, _STOP_POLL_SLICE_NS)
-            # Use wait() on stop_event for immediate wake on stop/pause when slice is >= 2ms.
-            if sleep_ns >= 2_000_000:
-                if stop_event.wait(timeout=sleep_ns / 1_000_000_000):
-                    return False
-            else:
-                time.sleep(sleep_ns / 1_000_000_000)
+            time.sleep(sleep_ns / 1_000_000_000)
         else:
             # Fine spin-wait for sub-millisecond accuracy.
             while time.perf_counter_ns() < target_ns:

@@ -44,6 +44,7 @@ class PlaybackSnapshot:
     focus_paused: bool = False
     active_labels: tuple[str, ...] = ()
     active_notes: tuple[int, ...] = ()
+    pedal_active: bool = False
     error_message: str = ""
 
 
@@ -244,6 +245,7 @@ class PlaybackScheduler:
                 origin_perf_ns = time.perf_counter_ns() - start_scaled_ns
                 last_progress_ns = 0
                 active_notes: dict[int, str] = {}
+                pedal_active = False
 
                 for batch in batches:
                     if self._stop_event.is_set():
@@ -265,19 +267,25 @@ class PlaybackScheduler:
                     if not dry_run:
                         self._backend.execute_batch(batch)
 
+                    prev_pedal_active = pedal_active
                     for act in batch:
                         if act.midi_note >= 0:
                             if act.kind == "down":
                                 active_notes[act.midi_note] = act.label
                             else:
                                 active_notes.pop(act.midi_note, None)
+                        elif act.label == "Space":
+                            pedal_active = act.kind == "down"
 
                     pos_ms = batch[-1].song_ms
                     with self._lock:
                         self._position_ms = pos_ms
 
                     now_ns = time.perf_counter_ns()
-                    if now_ns - last_progress_ns >= _PROGRESS_THROTTLE_NS:
+                    if (
+                        pedal_active != prev_pedal_active
+                        or now_ns - last_progress_ns >= _PROGRESS_THROTTLE_NS
+                    ):
                         last_progress_ns = now_ns
                         self._emit(
                             PlaybackSnapshot(
@@ -286,6 +294,7 @@ class PlaybackScheduler:
                                 duration_ms=dur_ms,
                                 active_labels=tuple(active_notes.values()),
                                 active_notes=tuple(active_notes.keys()),
+                                pedal_active=pedal_active,
                             )
                         )
 
