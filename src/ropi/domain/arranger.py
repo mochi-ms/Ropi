@@ -18,7 +18,7 @@ ActionKind = Literal["down", "up"]
 
 _KIND_ORDER: dict[ActionKind, int] = {"up": 0, "down": 1}
 _MODIFIER_ORDER: dict[Modifier, int] = {"none": 0, "shift": 1, "ctrl": 2}
-_MIN_REPRESS_GAP_NS = 8_000_000  # 8ms minimum release before re-striking same key
+_MIN_REPRESS_GAP_NS = 18_000_000  # 18ms (>1 Roblox 60Hz frame) release before re-striking same key
 _MIN_HOLD_NS = 15_000_000  # 15ms minimum press duration
 _PEDAL_LIFT_GAP_NS = 30_000_000  # >= 30ms release so Roblox registers Space InputEnded->InputBegan
 _PEDAL_MIN_HOLD_NS = 25_000_000
