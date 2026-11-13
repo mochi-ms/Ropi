@@ -21,9 +21,9 @@
 - [x] 완료 기준: domain/formats 커버리지 ≥ 85%
 
 ## Phase 2 — 라이브러리 백엔드
-- [ ] `library/db.py`, `migrations/001_init.sql`, `file_store.py`, `repository.py`, `search.py`, `service.py`, `backup.py`
-- [ ] `domain/hangul.py`, `formats/ropi_format.py`, `formats/lrc.py`
-- [ ] 완료 기준: CRUD/휴지통/중복/마이그레이션/백업복원 테스트, 1만곡 검색 ≤ 100ms, 초성 검색, 커버리지 ≥ 85%
+- [x] `library/db.py`, `migrations/001_init.sql`, `file_store.py`, `repository.py`, `search.py`, `service.py`, `backup.py`
+- [x] `domain/hangul.py`, `formats/ropi_format.py`, `formats/lrc.py`
+- [x] 완료 기준: CRUD/휴지통/중복/마이그레이션/백업복원 테스트 (`37 passed`), 1만곡 검색 `0.46ms` (`<= 100ms`), 초성 검색 (`"ㅇㄹㄹ"`, `"ㅂㅈㄱ"`, `"ㅂㅎㄴ piano"`), `library/` 커버리지 87~100% (`>= 85%`)
 
 ## Phase 3 — 메인 GUI
 - [ ] 테마/폰트/아이콘, `MainWindow`, 라이브러리/지금재생/설정 페이지, 단일 인스턴스, 첫 실행 마법사

@@ -10,6 +10,7 @@ from ropi.domain.arranger import ArrangeOptions, KeyAction, arrange_song, sugges
 from ropi.domain.keymap import Keymap, build_roblox_61_profile, build_roblox_88_profile
 from ropi.domain.note import SongData
 from ropi.formats.midi_loader import load_midi
+from ropi.formats.ropi_format import load_ropi
 from ropi.formats.vp_sheet import load_vp_sheet_file
 from ropi.playback.focus_watcher import FocusBackend, Win32FocusBackend
 from ropi.playback.scheduler import (
@@ -22,12 +23,14 @@ from ropi.playback.win32_input import InputBackend, Win32InputBackend
 
 
 def load_song_file(path: Path, *, keymap: Keymap | None = None) -> SongData:
-    """Load any supported Phase 1 song format (.mid, .midi, .txt) into SongData."""
+    """Load any supported song format (.mid, .midi, .txt, .ropi) into SongData."""
     ext = path.suffix.lower()
     if ext in {".mid", ".midi"}:
         return load_midi(path)
     if ext == ".txt":
         return load_vp_sheet_file(path, keymap=keymap)
+    if ext == ".ropi":
+        return load_ropi(path, keymap=keymap).song
     raise FormatLoadError(f"지원하지 않는 파일 형식입니다: {ext or '(없음)'}")
 
 
