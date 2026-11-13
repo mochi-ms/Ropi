@@ -62,6 +62,28 @@ class Win32FocusBackend:
         self._user32 = ctypes.WinDLL("user32", use_last_error=True)
         self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
+        self._user32.GetForegroundWindow.argtypes = ()
+        self._user32.GetForegroundWindow.restype = wintypes.HWND
+        self._user32.IsWindowVisible.argtypes = (wintypes.HWND,)
+        self._user32.IsWindowVisible.restype = wintypes.BOOL
+        self._user32.IsIconic.argtypes = (wintypes.HWND,)
+        self._user32.IsIconic.restype = wintypes.BOOL
+        self._user32.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
+        self._user32.ShowWindow.restype = wintypes.BOOL
+        self._user32.SetForegroundWindow.argtypes = (wintypes.HWND,)
+        self._user32.SetForegroundWindow.restype = wintypes.BOOL
+        self._user32.BringWindowToTop.argtypes = (wintypes.HWND,)
+        self._user32.BringWindowToTop.restype = wintypes.BOOL
+        self._user32.AttachThreadInput.argtypes = (wintypes.DWORD, wintypes.DWORD, wintypes.BOOL)
+        self._user32.AttachThreadInput.restype = wintypes.BOOL
+        self._user32.GetWindowThreadProcessId.argtypes = (
+            wintypes.HWND,
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        self._user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+
+        self._kernel32.GetCurrentThreadId.argtypes = ()
+        self._kernel32.GetCurrentThreadId.restype = wintypes.DWORD
         self._kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
         self._kernel32.OpenProcess.restype = wintypes.HANDLE
         self._kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)

@@ -19,6 +19,11 @@ class HighResTimer:
         self._period_ms = period_ms
         self._active = False
         self._winmm = ctypes.WinDLL("winmm") if sys.platform == "win32" else None
+        if self._winmm is not None:
+            self._winmm.timeBeginPeriod.argtypes = (ctypes.c_uint,)
+            self._winmm.timeBeginPeriod.restype = ctypes.c_uint
+            self._winmm.timeEndPeriod.argtypes = (ctypes.c_uint,)
+            self._winmm.timeEndPeriod.restype = ctypes.c_uint
 
     def __enter__(self) -> HighResTimer:
         if self._winmm is not None:
