@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv\Scripts\pip.exe install -r requirements.txt -r requirements-dev.txt
+          .\.venv\Scripts\pip.exe install -e . --no-deps
+
+      - name: Ruff lint
+        run: .\.venv\Scripts\ruff.exe check .
+
+      - name: Ruff format check
+        run: .\.venv\Scripts\ruff.exe format --check .
+
+      - name: Pyright type check
+        run: .\.venv\Scripts\pyright.exe
+
+      - name: Run pytest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: .\.venv\Scripts\pytest.exe -q --cov=ropi

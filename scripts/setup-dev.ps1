@@ -1,10 +1,10 @@
-﻿<#
+<#
 .SYNOPSIS
   Ropi development environment bootstrap (Windows 10/11, PowerShell 5.1+).
 
 .DESCRIPTION
-  Installs: Git, VS Code, Python 3.12, FFmpeg, GitHub CLI (via winget),
-  VS Code extensions, clones the repo, creates .venv and installs requirements.
+  Installs: Git, VS Code, Python 3.12, FFmpeg, GitHub CLI (via winget or portable fallback),
+  VS Code extensions, clones the repo (or uses current repo), creates .venv and installs requirements.
   Safe to run multiple times (idempotent).
 
 .EXAMPLE
@@ -13,7 +13,7 @@
 #>
 param(
     [string]$RepoUrl   = "https://github.com/mochi-ms/Ropi.git",
-    [string]$TargetDir = "$env:USERPROFILE\dev\Ropi",
+    [string]$TargetDir = "",
     [switch]$WithAI,          # also install requirements-ai.txt (PyTorch etc., ~2GB)
     [switch]$SkipApps         # skip winget installs
 )
@@ -26,7 +26,15 @@ function Warn($m) { Write-Host "[WARN] $m" -ForegroundColor Yellow }
 function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $user    = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = "$machine;$user"
+    $extra   = @(
+        "C:\Program Files\Git\cmd",
+        "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin",
+        "$env:LOCALAPPDATA\Programs\Python\Python312",
+        "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts",
+        "$env:LOCALAPPDATA\Programs\gh\bin",
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
+    ) -join ";"
+    $env:Path = "$machine;$user;$extra"
 }
 
 function Test-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
@@ -46,7 +54,6 @@ function Install-Winget($id, $cmd, [switch]$UserScope) {
 }
 
 function Install-MinGitPortable {
-    # Fallback when the Git installer cannot get admin rights (UAC denied).
     Info "Installing portable MinGit (no admin required) ..."
     $rel = Invoke-RestMethod "https://api.github.com/repos/git-for-windows/git/releases/latest"
     $asset = $rel.assets | Where-Object { $_.name -match '^MinGit-[\d\.]+-64-bit\.zip$' } | Select-Object -First 1
@@ -64,6 +71,36 @@ function Install-MinGitPortable {
     Ok "MinGit installed at $dest"
 }
 
+function Install-GhPortable {
+    Info "Installing portable GitHub CLI (no admin required) ..."
+    $rel = Invoke-RestMethod "https://api.github.com/repos/cli/cli/releases/latest"
+    $asset = $rel.assets | Where-Object { $_.name -match '^gh_[\d\.]+_windows_amd64\.zip$' } | Select-Object -First 1
+    $dest = "$env:LOCALAPPDATA\Programs\gh"
+    New-Item -ItemType Directory -Force $dest | Out-Null
+    $zip = "$env:TEMP\gh.zip"
+    Invoke-WebRequest $asset.browser_download_url -OutFile $zip
+    Expand-Archive $zip -DestinationPath $dest -Force
+    Remove-Item $zip -Force
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -notlike "*$dest\bin*") {
+        [Environment]::SetEnvironmentVariable("Path", "$userPath;$dest\bin", "User")
+    }
+    Refresh-Path
+    Ok "GitHub CLI installed at $dest"
+}
+
+Refresh-Path
+
+# Resolve TargetDir automatically when run inside an existing clone
+if (-not $TargetDir) {
+    $scriptParent = Split-Path -Parent $PSScriptRoot
+    if ($scriptParent -and (Test-Path (Join-Path $scriptParent "docs\SPEC.md"))) {
+        $TargetDir = $scriptParent
+    } else {
+        $TargetDir = "$env:USERPROFILE\dev\Ropi"
+    }
+}
+
 # ---------------------------------------------------------------- 1. Apps
 if (-not $SkipApps) {
     if (-not (Test-Cmd "winget")) {
@@ -73,7 +110,7 @@ if (-not $SkipApps) {
     Install-Winget "Microsoft.VisualStudioCode" "code" -UserScope | Out-Null
     Install-Winget "Python.Python.3.12" $null -UserScope | Out-Null
     Install-Winget "Gyan.FFmpeg" "ffmpeg" | Out-Null
-    Install-Winget "GitHub.cli" "gh" | Out-Null
+    if (-not (Install-Winget "GitHub.cli" "gh")) { Install-GhPortable }
     Refresh-Path
 }
 
@@ -96,14 +133,13 @@ if (-not (git config --global user.email)) { git config --global user.email (Rea
 git config --global core.autocrlf true
 git config --global init.defaultBranch main
 
-# ---------------------------------------------------------------- 4. Clone
+# ---------------------------------------------------------------- 4. Clone / Sync
 if (-not (Test-Path "$TargetDir\.git")) {
     Info "Cloning $RepoUrl -> $TargetDir"
     New-Item -ItemType Directory -Force (Split-Path $TargetDir) | Out-Null
     git clone $RepoUrl $TargetDir
 } else {
-    Info "Repo exists, pulling latest"
-    git -C $TargetDir pull --ff-only
+    Info "Repo exists at $TargetDir"
 }
 Set-Location $TargetDir
 
@@ -115,7 +151,7 @@ if (Test-Cmd "code") {
         "seanwu.vscode-qt-for-python", "yzhang.markdown-all-in-one",
         "bierner.markdown-mermaid", "github.vscode-github-actions"
     )
-    foreach ($e in $exts) { code --install-extension $e --force | Out-Null }
+    foreach ($e in $exts) { & code --install-extension $e --force | Out-Null }
     Ok "VS Code extensions installed"
 } else { Warn "VS Code CLI 'code' not on PATH yet (re-open terminal)" }
 
@@ -129,6 +165,7 @@ $vpy = ".\.venv\Scripts\python.exe"
 foreach ($req in @("requirements.txt", "requirements-dev.txt")) {
     if (Test-Path $req) { & $vpy -m pip install -r $req }
 }
+& $vpy -m pip install -e . --no-deps
 if ($WithAI -and (Test-Path "requirements-ai.txt")) {
     $hasNvidia = [bool](Get-Command "nvidia-smi" -ErrorAction SilentlyContinue)
     if ($hasNvidia) {
@@ -151,4 +188,3 @@ foreach ($c in @("git", "code", "ffmpeg", "gh")) {
 Write-Host "  venv     $TargetDir\.venv"
 Write-Host ""
 Write-Host "Next: 'gh auth login' (once), then 'code .' to open the project."
-

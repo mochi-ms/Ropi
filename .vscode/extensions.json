@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml",
+    "eamodio.gitlens",
+    "seanwu.vscode-qt-for-python",
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid",
+    "github.vscode-github-actions"
+  ]
+}

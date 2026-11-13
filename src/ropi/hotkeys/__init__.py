@@ -1,0 +1,1 @@
+"""Global Windows hotkey management."""

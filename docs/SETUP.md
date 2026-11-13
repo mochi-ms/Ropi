@@ -77,7 +77,7 @@ pytest>=8
 pytest-qt>=4.4
 pytest-cov>=5
 ruff>=0.6
-pyright>=1.1.380
+pyright[nodejs]>=1.1.380
 pyinstaller>=6.10
 ```
 

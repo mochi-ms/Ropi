@@ -1,0 +1,1 @@
+"""Subprocess transcription worker."""
